@@ -4,29 +4,25 @@ import { useEffect, useRef, useState } from 'react';
 import type { Candle } from '@/types';
 
 const RESOLUTIONS = [
-  { label: '1S', value: 'W',  days: 7  },
-  { label: '1M', value: 'D',  days: 30  },
-  { label: '3M', value: 'D',  days: 90  },
-  { label: '1A', value: 'W',  days: 365 },
+  { label: '1S', value: 'W', days: 7   },
+  { label: '1M', value: 'D', days: 30  },
+  { label: '3M', value: 'D', days: 90  },
+  { label: '1A', value: 'W', days: 365 },
 ];
 
-export default function StockChart({
-  symbol,
-  label,
-}: {
-  symbol: string;
-  label: string;
-}) {
+export default function StockChart({ symbol, label }: { symbol: string; label: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
+  const [chartReady, setChartReady] = useState(false);
   const [resolution, setResolution] = useState(RESOLUTIONS[1]);
   const [quote, setQuote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Init chart une seule fois
+  // Init chart une seule fois — set chartReady quand c'est prêt
   useEffect(() => {
     if (!containerRef.current) return;
+    let cleanup: (() => void) | undefined;
 
     import('lightweight-charts').then(({ createChart, CandlestickSeries }) => {
       if (!containerRef.current) return;
@@ -41,10 +37,7 @@ export default function StockChart({
           horzLines: { color: '#1f2937' },
         },
         crosshair: { mode: 1 },
-        timeScale: {
-          borderColor: '#374151',
-          timeVisible: true,
-        },
+        timeScale: { borderColor: '#374151', timeVisible: true },
         rightPriceScale: { borderColor: '#374151' },
         width: containerRef.current.clientWidth,
         height: 380,
@@ -60,38 +53,44 @@ export default function StockChart({
 
       chartRef.current = chart;
       seriesRef.current = series;
+      setChartReady(true); // ← déclenche le 2ème useEffect
 
-      // Responsive resize
       const obs = new ResizeObserver(() => {
         if (containerRef.current)
           chart.applyOptions({ width: containerRef.current.clientWidth });
       });
       obs.observe(containerRef.current);
 
-      return () => { obs.disconnect(); chart.remove(); };
+      cleanup = () => {
+        obs.disconnect();
+        chart.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+        setChartReady(false);
+      };
     });
+
+    return () => cleanup?.();
   }, []);
 
-  // Fetch candles quand symbol/resolution change
+  // Fetch données — attend que chartReady soit true
   useEffect(() => {
-    if (!seriesRef.current) return;
+    if (!chartReady || !seriesRef.current) return;
     setLoading(true);
 
     async function load() {
       try {
-        // Quote
-        const qRes = await fetch(`/api/quote?symbols=${encodeURIComponent(symbol)}`);
+        const [qRes, cRes] = await Promise.all([
+          fetch(`/api/quote?symbols=${encodeURIComponent(symbol)}`),
+          fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&resolution=${resolution.value}`),
+        ]);
+
         const qData = await qRes.json();
         if (Array.isArray(qData) && qData[0]) setQuote(qData[0]);
 
-        // Candles
-        const cRes = await fetch(
-          `/api/candles?symbol=${encodeURIComponent(symbol)}&resolution=${resolution.value}`
-        );
         const raw = await cRes.json();
 
         if (raw.s === 'ok' && seriesRef.current) {
-          // Filtrer selon la période choisie
           const cutoff = Math.floor(Date.now() / 1000) - resolution.days * 86400;
           const candles: Candle[] = raw.t
             .map((t: number, i: number) => ({
@@ -100,27 +99,29 @@ export default function StockChart({
               high: raw.h[i],
               low: raw.l[i],
               close: raw.c[i],
-              volume: raw.v[i],
             }))
             .filter((c: Candle) => c.time >= cutoff)
             .sort((a: Candle, b: Candle) => a.time - b.time);
 
           seriesRef.current.setData(candles);
           chartRef.current?.timeScale().fitContent();
+        } else if (raw.s !== 'ok') {
+          console.warn('[StockChart] Finnhub returned:', raw.s, 'for', symbol);
         }
+      } catch (err) {
+        console.error('[StockChart] load error:', err);
       } finally {
         setLoading(false);
       }
     }
 
     load();
-  }, [symbol, resolution]);
+  }, [chartReady, symbol, resolution]); // ← chartReady dans les deps
 
   const up = quote ? quote.dp >= 0 : null;
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-      {/* Header */}
       <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -133,12 +134,11 @@ export default function StockChart({
                 {new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2 }).format(quote.c)}
               </span>
               <span className={`text-sm font-medium ${up ? 'text-green-400' : 'text-red-400'}`}>
-                {up ? '+' : ''}{quote.d.toFixed(2)} ({up ? '+' : ''}{quote.dp.toFixed(2)}%)
+                {up ? '+' : ''}{quote.d?.toFixed(2)} ({up ? '+' : ''}{quote.dp?.toFixed(2)}%)
               </span>
             </div>
           )}
         </div>
-        {/* Sélecteur période */}
         <div className="flex gap-1">
           {RESOLUTIONS.map(r => (
             <button
@@ -156,14 +156,14 @@ export default function StockChart({
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="relative">
+      {/* Container doit avoir une hauteur fixe pour que le chart s'affiche */}
+      <div className="relative h-[380px]">
         {loading && (
           <div className="absolute inset-0 bg-gray-900/70 flex items-center justify-center z-10">
             <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-        <div ref={containerRef} />
+        <div ref={containerRef} className="w-full h-full" />
       </div>
     </div>
   );
