@@ -84,7 +84,7 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
       try {
         const [qRes, cRes] = await Promise.all([
           fetch(`/api/quote?symbols=${encodeURIComponent(symbol)}`),
-          fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&resolution=${resolution.value}`),
+          fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&resolution=${resolution.value}&days=${resolution.days}`),
         ]);
 
         // Quote
