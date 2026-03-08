@@ -18,8 +18,9 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
   const [resolution, setResolution] = useState(RESOLUTIONS[1]);
   const [quote, setQuote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Init chart une seule fois — set chartReady quand c'est prêt
+  // Init chart une seule fois
   useEffect(() => {
     if (!containerRef.current) return;
     let cleanup: (() => void) | undefined;
@@ -53,7 +54,7 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
 
       chartRef.current = chart;
       seriesRef.current = series;
-      setChartReady(true); // ← déclenche le 2ème useEffect
+      setChartReady(true);
 
       const obs = new ResizeObserver(() => {
         if (containerRef.current)
@@ -73,10 +74,11 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
     return () => cleanup?.();
   }, []);
 
-  // Fetch données — attend que chartReady soit true
+  // Fetch données dès que chartReady + symbol/resolution change
   useEffect(() => {
     if (!chartReady || !seriesRef.current) return;
     setLoading(true);
+    setError(null);
 
     async function load() {
       try {
@@ -85,13 +87,17 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
           fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&resolution=${resolution.value}`),
         ]);
 
+        // Quote
         const qData = await qRes.json();
         if (Array.isArray(qData) && qData[0]) setQuote(qData[0]);
 
+        // Candles
         const raw = await cRes.json();
+        console.log('[StockChart] symbol:', symbol, '| status:', raw.s, '| points:', raw.t?.length ?? 0);
 
-        if (raw.s === 'ok' && seriesRef.current) {
+        if (raw.s === 'ok' && Array.isArray(raw.t) && raw.t.length > 0 && seriesRef.current) {
           const cutoff = Math.floor(Date.now() / 1000) - resolution.days * 86400;
+
           const candles: Candle[] = raw.t
             .map((t: number, i: number) => ({
               time: t,
@@ -100,28 +106,42 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
               low: raw.l[i],
               close: raw.c[i],
             }))
-            .filter((c: Candle) => c.time >= cutoff)
-            .sort((a: Candle, b: Candle) => a.time - b.time);
+            .filter((c: Candle) => (c.time as unknown as number) >= cutoff)
+            .sort((a: Candle, b: Candle) => (a.time as any) - (b.time as any));
 
-          seriesRef.current.setData(candles);
-          chartRef.current?.timeScale().fitContent();
-        } else if (raw.s !== 'ok') {
-          console.warn('[StockChart] Finnhub returned:', raw.s, 'for', symbol);
+          console.log('[StockChart] candles after filter:', candles.length, '| first:', candles[0]);
+
+          if (candles.length > 0) {
+            seriesRef.current.setData(candles);
+            chartRef.current?.timeScale().fitContent();
+          } else {
+            setError(`Aucune donnée pour la période sélectionnée.`);
+          }
+        } else {
+          const reason = raw.s === 'no_data'
+            ? 'Finnhub ne dispose pas de données pour ce symbole (free tier).'
+            : raw.s === 'error'
+            ? 'Erreur Finnhub — vérifie ta clé API.'
+            : `Statut inconnu : ${raw.s}`;
+          setError(reason);
+          console.warn('[StockChart] No data:', raw.s, 'for', symbol);
         }
       } catch (err) {
-        console.error('[StockChart] load error:', err);
+        console.error('[StockChart] fetch error:', err);
+        setError('Erreur réseau lors du chargement du graphique.');
       } finally {
         setLoading(false);
       }
     }
 
     load();
-  }, [chartReady, symbol, resolution]); // ← chartReady dans les deps
+  }, [chartReady, symbol, resolution]);
 
   const up = quote ? quote.dp >= 0 : null;
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      {/* Header */}
       <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -139,6 +159,7 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
             </div>
           )}
         </div>
+        {/* Sélecteur période */}
         <div className="flex gap-1">
           {RESOLUTIONS.map(r => (
             <button
@@ -156,11 +177,18 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
         </div>
       </div>
 
-      {/* Container doit avoir une hauteur fixe pour que le chart s'affiche */}
+      {/* Chart container */}
       <div className="relative h-[380px]">
         {loading && (
           <div className="absolute inset-0 bg-gray-900/70 flex items-center justify-center z-10">
             <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {!loading && error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-10 gap-2">
+            <span className="text-3xl">📭</span>
+            <p className="text-gray-400 text-sm text-center max-w-xs">{error}</p>
+            <p className="text-gray-600 text-xs">Essaie un autre symbole ou une autre période.</p>
           </div>
         )}
         <div ref={containerRef} className="w-full h-full" />
