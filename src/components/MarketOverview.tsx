@@ -3,20 +3,20 @@
 import { useEffect, useState, useCallback } from 'react';
 
 const INDICES = [
-  { symbol: 'SPY',             label: 'S&P 500',  sub: 'US Équities',  flag: '🇺🇸' },
-  { symbol: 'QQQ',             label: 'Nasdaq',   sub: 'US Tech',      flag: '📱'  },
-  { symbol: 'BINANCE:BTCUSDT', label: 'Bitcoin',  sub: 'Crypto',       flag: '₿'   },
-  { symbol: 'BINANCE:ETHUSDT', label: 'Ethereum', sub: 'Crypto',       flag: 'Ξ'   },
-  { symbol: 'GLD',             label: 'Gold ETF', sub: 'Matières premières', flag: '🥇' },
+  { symbol: 'SPY',             label: 'S&P 500',  sub:'US Équities',       flag: '🇺🇸' },
+  { symbol: 'QQQ',             label: 'Nasdaq',   sub:'US Tech',           flag: '📱'  },
+  { symbol: 'BINANCE:BTCUSDT', label: 'Bitcoin',  sub:'Crypto',            flag: '₿'   },
+  { symbol: 'BINANCE:ETHUSDT', label: 'Ethereum', sub:'Crypto',            flag: 'Ξ'   },
+  { symbol: 'GLD',             label: 'Gold ETF', sub:'Matières premières', flag: '🥇' },
 ];
 
 const fmt = (v: number) =>
-  new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+  new Intl.NumberFormat('fr-FR', { minimumFractionDigits:2, maximumFractionDigits:2 }).format(v);
 
 export default function MarketOverview({
   onSelect, activeSymbol,
 }: {
-  onSelect: (symbol: string, label: string) => void;
+  onSelect: (s: string, l: string) => void;
   activeSymbol: string;
 }) {
   const [quotes,  setQuotes]  = useState<Record<string, any>>({});
@@ -44,101 +44,98 @@ export default function MarketOverview({
   }, [fetchQuotes]);
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(5, 1fr)',
-      gap: 12,
-    }}
-      className="indices-grid"
-    >
-      {INDICES.map(({ symbol, label, sub, flag }) => {
-        const q      = quotes[symbol];
-        const isUp   = q ? q.dp >= 0 : null;
-        const color  = isUp === null ? 'rgba(235,235,245,0.6)' : isUp ? 'var(--green)' : 'var(--red)';
-        const active = activeSymbol === symbol;
+    <>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, 1fr)',
+        gap: 12,
+      }}
+        className="indices-grid"
+      >
+        {INDICES.map(({ symbol, label, flag }, idx) => {
+          const q      = quotes[symbol];
+          const isUp   = q ? q.dp >= 0 : null;
+          const color  = isUp === null ? 'rgba(235,235,245,0.6)' : isUp ? 'var(--green)' : 'var(--red)';
+          const active = activeSymbol === symbol;
 
-        return (
-          <button
-            key={symbol}
-            onClick={() => onSelect(symbol, label)}
-            style={{
-              background:    active ? '#1c1c1e' : '#1c1c1e',
-              border:        active ? '1px solid rgba(10,132,255,0.5)' : '1px solid transparent',
-              borderRadius:  16,
-              padding:       '20px 20px 18px',
-              textAlign:     'left',
-              cursor:        'pointer',
-              transition:    'border-color 0.2s, transform 0.15s',
-              transform:     active ? 'scale(1.01)' : 'scale(1)',
-              outline:       'none',
-              position:      'relative',
-              overflow:      'hidden',
-            }}
-            onMouseEnter={e => {
-              if (!active) e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-            }}
-            onMouseLeave={e => {
-              if (!active) e.currentTarget.style.border = '1px solid transparent';
-            }}
-          >
-            {/* Stripe colorée en haut si actif */}
-            {active && (
-              <div style={{
-                position: 'absolute', top: 0, left: 0, right: 0,
-                height: 2, background: 'var(--blue)',
-                borderRadius: '16px 16px 0 0',
-              }} />
-            )}
-
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 22 }}>{flag}</span>
-              {!loading && q && (
-                <span
-                  className={`num ${isUp ? 'pill-up' : 'pill-down'}`}
-                  style={{ fontSize: 12, fontWeight: 600, padding: '3px 8px' }}
-                >
-                  {isUp ? '+' : ''}{q.dp.toFixed(2)}%
-                </span>
+          return (
+            <button
+              key={symbol}
+              onClick={() => onSelect(symbol, label)}
+              className={`lift animate-fade-up delay-${idx + 1}`}
+              style={{
+                background:   '#1c1c1e',
+                border:       active ? '1px solid rgba(10,132,255,0.45)' : '1px solid rgba(255,255,255,0)',
+                borderRadius: 16,
+                padding:      '20px 20px 18px',
+                textAlign:    'left',
+                cursor:       'pointer',
+                outline:      'none',
+                position:     'relative',
+                overflow:     'hidden',
+                transform:    active ? 'translateY(-3px)' : undefined,
+                boxShadow:    active ? '0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(10,132,255,0.2)' : undefined,
+              }}
+            >
+              {/* Stripe active */}
+              {active && (
+                <div style={{
+                  position:'absolute', top:0, left:0, right:0, height:2,
+                  background:'var(--blue)', borderRadius:'16px 16px 0 0',
+                  transition:'opacity 0.2s',
+                }} />
               )}
-            </div>
 
-            <p style={{ fontSize: 12, color: 'rgba(235,235,245,0.5)', marginBottom: 3, letterSpacing: '0.02em', fontWeight: 500 }}>
-              {label}
-            </p>
-
-            {loading ? (
+              {/* Glow coloré trs subtil */}
               <div style={{
-                height: 22, width: '70%', borderRadius: 6,
-                background: '#2c2c2e', animation: 'pulse 1.5s ease-in-out infinite',
+                position:'absolute', bottom:-20, right:-20,
+                width:80, height:80, borderRadius:'50%',
+                background: color,
+                filter:'blur(24px)',
+                opacity: active ? 0.12 : 0.05,
+                transition:'opacity 0.3s',
+                pointerEvents:'none',
               }} />
-            ) : q ? (
-              <>
-                <p className="num" style={{ fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-0.4px', lineHeight: 1.2 }}>
-                  {fmt(q.c)}
-                </p>
-                <p className="num" style={{ fontSize: 13, marginTop: 2, color, fontWeight: 500 }}>
-                  {isUp ? '+' : ''}{fmt(q.d)}
-                </p>
-              </>
-            ) : (
-              <p style={{ color: 'rgba(235,235,245,0.3)', fontSize: 15 }}>—</p>
-            )}
-          </button>
-        );
-      })}
+
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
+                <span style={{ fontSize:22 }}>{flag}</span>
+                {!loading && q && (
+                  <span
+                    className={`num ${isUp ? 'pill-up' : 'pill-down'}`}
+                    style={{ fontSize:12, fontWeight:600, padding:'3px 8px', transition:'all 0.2s' }}
+                  >
+                    {isUp ? '+' : ''}{q.dp.toFixed(2)}%
+                  </span>
+                )}
+              </div>
+
+              <p style={{ fontSize:12, color:'rgba(235,235,245,0.45)', marginBottom:4, fontWeight:500 }}>
+                {label}
+              </p>
+
+              {loading ? (
+                <div style={{ height:22, width:'70%', borderRadius:6, background:'#2c2c2e', animation:'pulse 1.5s ease-in-out infinite' }} />
+              ) : q ? (
+                <>
+                  <p className="num" style={{ fontSize:22, fontWeight:700, color:'#fff', letterSpacing:'-0.4px', lineHeight:1.2 }}>
+                    {fmt(q.c)}
+                  </p>
+                  <p className="num" style={{ fontSize:13, marginTop:3, color, fontWeight:500 }}>
+                    {isUp ? '+' : ''}{fmt(q.d)}
+                  </p>
+                </>
+              ) : (
+                <p style={{ color:'rgba(235,235,245,0.3)', fontSize:15 }}>—</p>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
       <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.8; }
-        }
-        @media (max-width: 1024px) {
-          .indices-grid { grid-template-columns: repeat(3, 1fr) !important; }
-        }
-        @media (max-width: 600px) {
-          .indices-grid { grid-template-columns: repeat(2, 1fr) !important; }
-        }
+        @media (max-width: 1024px) { .indices-grid { grid-template-columns: repeat(3,1fr) !important; } }
+        @media (max-width:  600px) { .indices-grid { grid-template-columns: repeat(2,1fr) !important; } }
       `}</style>
-    </div>
+    </>
   );
 }
