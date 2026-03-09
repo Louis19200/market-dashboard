@@ -54,27 +54,40 @@ export default function TopMovers({
     .slice(0, 5);
 
   return (
-    <div className="glass rounded-2xl p-4 flex flex-col">
+    <div style={{ background: '#1c1c1e', borderRadius: 20, overflow: 'hidden' }}>
 
-      {/* Header + onglets */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-bold text-white text-sm">🔥 Top Movers</h2>
-        <div
-          className="flex gap-1 rounded-xl p-0.5"
-          style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}
-        >
+      {/* Header */}
+      <div style={{
+        padding: '20px 20px 0',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        marginBottom: 12,
+      }}>
+        <p style={{ fontSize: 17, fontWeight: 600, color: '#fff', letterSpacing: '-0.022em' }}>
+          Movers
+        </p>
+        {/* Segmented control */}
+        <div style={{
+          display:'flex', gap:2, background:'#2c2c2e',
+          borderRadius:8, padding:3,
+        }}>
           {(['gainers','losers'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
               style={{
-                background: tab === t
-                  ? (t === 'gainers' ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)')
-                  : 'transparent',
-                color: tab === t
-                  ? (t === 'gainers' ? '#34d399' : '#f87171')
-                  : 'rgba(148,163,184,0.5)',
+                padding:     '5px 12px',
+                borderRadius: 6,
+                border:      'none',
+                fontSize:    12,
+                fontWeight:  600,
+                fontFamily:  'inherit',
+                cursor:      'pointer',
+                transition:  'all 0.15s',
+                background:  tab === t ? '#3a3a3c' : 'transparent',
+                color:       tab === t
+                  ? (t === 'gainers' ? 'var(--green)' : 'var(--red)')
+                  : 'rgba(235,235,245,0.4)',
+                boxShadow:   tab === t ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
               }}
             >
               {t === 'gainers' ? '▲ Hausse' : '▼ Baisse'}
@@ -84,46 +97,71 @@ export default function TopMovers({
       </div>
 
       {/* Liste */}
-      <div className="space-y-0.5">
+      <div style={{ padding: '4px 0 8px' }}>
         {loading
           ? [...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="h-12 rounded-xl animate-pulse"
-                style={{ background:'rgba(255,255,255,0.03)' }}
-              />
+              <div key={i} style={{
+                margin:'2px 12px', height:52, borderRadius:10,
+                background:'#2c2c2e', animation:'pulse 1.5s ease-in-out infinite',
+              }} />
             ))
-          : sorted.map(q => {
+          : sorted.map((q, i) => {
               const isUp  = q.dp >= 0;
-              const color = isUp ? '#34d399' : '#f87171';
+              const color = isUp ? 'var(--green)' : 'var(--red)';
               return (
                 <button
                   key={q.symbol}
                   onClick={() => onSelect(q.symbol, q.label)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group"
+                  style={{
+                    width:       '100%',
+                    display:     'flex',
+                    alignItems:  'center',
+                    justifyContent:'space-between',
+                    padding:     '10px 20px',
+                    background:  'transparent',
+                    border:      'none',
+                    borderTop:   i > 0 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                    cursor:      'pointer',
+                    textAlign:   'left',
+                    transition:  'background 0.1s',
+                    fontFamily:  'inherit',
+                  }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
-                      style={{ background:`${color}12`, color, border:`1px solid ${color}25` }}
-                    >
-                      {q.symbol.slice(0,2)}
+                  <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                    {/* Avatar */}
+                    <div style={{
+                      width:        36,
+                      height:       36,
+                      borderRadius: 10,
+                      background:   '#2c2c2e',
+                      display:      'flex',
+                      alignItems:   'center',
+                      justifyContent:'center',
+                      fontSize:     12,
+                      fontWeight:   700,
+                      color:        'rgba(235,235,245,0.7)',
+                      flexShrink:   0,
+                      letterSpacing:'-0.5px',
+                    }}>
+                      {q.symbol.slice(0, 2)}
                     </div>
-                    <div className="text-left">
-                      <p className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">
+                    <div>
+                      <p style={{ fontSize:15, fontWeight:600, color:'#fff', letterSpacing:'-0.16px' }}>
                         {q.symbol}
                       </p>
-                      <p className="text-xs muted">{q.label}</p>
+                      <p style={{ fontSize:13, color:'rgba(235,235,245,0.4)', marginTop:1 }}>
+                        {q.label}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-white num">{fmt(q.c)}</p>
-                    <p
-                      className="text-xs font-bold num"
-                      style={{ color }}
-                    >
+
+                  <div style={{ textAlign:'right' }}>
+                    <p className="num" style={{ fontSize:15, fontWeight:500, color:'#fff', letterSpacing:'-0.16px' }}>
+                      {fmt(q.c)}
+                    </p>
+                    <p className="num" style={{ fontSize:13, fontWeight:600, color, marginTop:1 }}>
                       {isUp ? '+' : ''}{q.dp.toFixed(2)}%
                     </p>
                   </div>
@@ -132,6 +170,10 @@ export default function TopMovers({
             })
         }
       </div>
+
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:.8} }
+      `}</style>
     </div>
   );
 }

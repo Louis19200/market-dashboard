@@ -3,24 +3,24 @@
 import { useEffect, useState, useCallback } from 'react';
 
 const INDICES = [
-  { symbol: 'SPY',             label: 'S&P 500',  flag: '🇺🇸' },
-  { symbol: 'QQQ',             label: 'Nasdaq',   flag: '💻'  },
-  { symbol: 'BINANCE:BTCUSDT', label: 'Bitcoin',  flag: '₿'   },
-  { symbol: 'BINANCE:ETHUSDT', label: 'Ethereum', flag: 'Ξ'   },
-  { symbol: 'GLD',             label: 'Gold ETF', flag: '🥇'  },
+  { symbol: 'SPY',             label: 'S&P 500',  sub: 'US Équities',  flag: '🇺🇸' },
+  { symbol: 'QQQ',             label: 'Nasdaq',   sub: 'US Tech',      flag: '📱'  },
+  { symbol: 'BINANCE:BTCUSDT', label: 'Bitcoin',  sub: 'Crypto',       flag: '₿'   },
+  { symbol: 'BINANCE:ETHUSDT', label: 'Ethereum', sub: 'Crypto',       flag: 'Ξ'   },
+  { symbol: 'GLD',             label: 'Gold ETF', sub: 'Matières premières', flag: '🥇' },
 ];
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
 export default function MarketOverview({
-  onSelect,
+  onSelect, activeSymbol,
 }: {
   onSelect: (symbol: string, label: string) => void;
+  activeSymbol: string;
 }) {
   const [quotes,  setQuotes]  = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const [active,  setActive]  = useState<string | null>(null);
 
   const fetchQuotes = useCallback(async () => {
     try {
@@ -44,74 +44,101 @@ export default function MarketOverview({
   }, [fetchQuotes]);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-      {INDICES.map(({ symbol, label, flag }) => {
-        const q       = quotes[symbol];
-        const isUp    = q ? q.dp >= 0 : null;
-        const color   = isUp === null ? '#94a3b8' : isUp ? '#34d399' : '#f87171';
-        const isActive = active === symbol;
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(5, 1fr)',
+      gap: 12,
+    }}
+      className="indices-grid"
+    >
+      {INDICES.map(({ symbol, label, sub, flag }) => {
+        const q      = quotes[symbol];
+        const isUp   = q ? q.dp >= 0 : null;
+        const color  = isUp === null ? 'rgba(235,235,245,0.6)' : isUp ? 'var(--green)' : 'var(--red)';
+        const active = activeSymbol === symbol;
 
         return (
           <button
             key={symbol}
-            onClick={() => { setActive(symbol); onSelect(symbol, label); }}
-            className="glass glass-hover text-left p-4 rounded-2xl relative overflow-hidden"
-            style={isActive ? {
-              borderColor: 'rgba(129,140,248,0.45)',
-              boxShadow:   '0 0 35px rgba(129,140,248,0.12)',
-              background:  'rgba(129,140,248,0.08)',
-              transform:   'translateY(-2px)',
-            } : {}}
+            onClick={() => onSelect(symbol, label)}
+            style={{
+              background:    active ? '#1c1c1e' : '#1c1c1e',
+              border:        active ? '1px solid rgba(10,132,255,0.5)' : '1px solid transparent',
+              borderRadius:  16,
+              padding:       '20px 20px 18px',
+              textAlign:     'left',
+              cursor:        'pointer',
+              transition:    'border-color 0.2s, transform 0.15s',
+              transform:     active ? 'scale(1.01)' : 'scale(1)',
+              outline:       'none',
+              position:      'relative',
+              overflow:      'hidden',
+            }}
+            onMouseEnter={e => {
+              if (!active) e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
+            }}
+            onMouseLeave={e => {
+              if (!active) e.currentTarget.style.border = '1px solid transparent';
+            }}
           >
-            {/* Glow déco */}
-            <div style={{
-              position:'absolute', top:-20, right:-20, width:70, height:70,
-              borderRadius:'50%', background: color,
-              filter:'blur(25px)', opacity: isActive ? 0.18 : 0.08,
-              pointerEvents:'none', transition:'opacity 0.3s',
-            }} />
+            {/* Stripe colorée en haut si actif */}
+            {active && (
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0,
+                height: 2, background: 'var(--blue)',
+                borderRadius: '16px 16px 0 0',
+              }} />
+            )}
 
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-lg">{flag}</span>
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 22 }}>{flag}</span>
               {!loading && q && (
                 <span
-                  className="text-xs font-bold num px-1.5 py-0.5 rounded-full"
-                  style={{
-                    background: `${color}15`,
-                    color,
-                    border: `1px solid ${color}30`,
-                  }}
+                  className={`num ${isUp ? 'pill-up' : 'pill-down'}`}
+                  style={{ fontSize: 12, fontWeight: 600, padding: '3px 8px' }}
                 >
-                  {isUp ? '▲' : '▼'} {Math.abs(q.dp).toFixed(2)}%
+                  {isUp ? '+' : ''}{q.dp.toFixed(2)}%
                 </span>
               )}
             </div>
 
-            <p className="text-xs mb-0.5" style={{ color:'rgba(148,163,184,0.7)' }}>{label}</p>
+            <p style={{ fontSize: 12, color: 'rgba(235,235,245,0.5)', marginBottom: 3, letterSpacing: '0.02em', fontWeight: 500 }}>
+              {label}
+            </p>
 
             {loading ? (
-              <div className="h-5 w-20 rounded-lg animate-pulse" style={{ background:'rgba(255,255,255,0.06)' }} />
+              <div style={{
+                height: 22, width: '70%', borderRadius: 6,
+                background: '#2c2c2e', animation: 'pulse 1.5s ease-in-out infinite',
+              }} />
             ) : q ? (
               <>
-                <p className="font-bold text-white num">{fmt(q.c)}</p>
-                <p className="text-xs num mt-0.5" style={{ color }}>
-                  {isUp ? '+' : ''}{q.d.toFixed(2)}
+                <p className="num" style={{ fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: '-0.4px', lineHeight: 1.2 }}>
+                  {fmt(q.c)}
+                </p>
+                <p className="num" style={{ fontSize: 13, marginTop: 2, color, fontWeight: 500 }}>
+                  {isUp ? '+' : ''}{fmt(q.d)}
                 </p>
               </>
             ) : (
-              <p className="muted text-sm">—</p>
-            )}
-
-            {/* Barre active */}
-            {isActive && (
-              <div
-                className="absolute bottom-0 left-0 right-0 h-0.5"
-                style={{ background:'linear-gradient(90deg,#818cf8,#f472b6)' }}
-              />
+              <p style={{ color: 'rgba(235,235,245,0.3)', fontSize: 15 }}>—</p>
             )}
           </button>
         );
       })}
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.8; }
+        }
+        @media (max-width: 1024px) {
+          .indices-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+        @media (max-width: 600px) {
+          .indices-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
     </div>
   );
 }

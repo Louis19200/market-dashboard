@@ -19,12 +19,12 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
   const seriesRef    = useRef<any>(null);
   const obsRef       = useRef<ResizeObserver | null>(null);
 
-  const [resolution,  setResolution]  = useState(RESOLUTIONS[1]);
-  const [quote,       setQuote]       = useState<any>(null);
-  const [loading,     setLoading]     = useState(true);
-  const [chartReady,  setChartReady]  = useState(false); // ← clé du fix
+  const [resolution, setResolution] = useState(RESOLUTIONS[1]);
+  const [quote,      setQuote]      = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+  const [chartReady, setChartReady] = useState(false);
 
-  // ── Init chart une seule fois ──────────────────────────────────────────────
+  // Init chart
   useEffect(() => {
     if (!containerRef.current) return;
     let cancelled = false;
@@ -34,28 +34,32 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
 
       const chart = createChart(containerRef.current, {
         layout: {
-          // ← fond solide (pas transparent, sinon lightweight-charts ne render pas)
-          background: { type: ColorType.Solid, color: '#0d0b1e' },
-          textColor:  'rgba(148,163,184,0.65)',
-          fontSize:   11,
+          background: { type: ColorType.Solid, color: '#1c1c1e' },
+          textColor:  'rgba(235,235,245,0.4)',
+          fontSize:   12,
+          fontFamily: "-apple-system, 'SF Pro Text', BlinkMacSystemFont, sans-serif",
         },
         grid: {
-          vertLines: { color: 'rgba(255,255,255,0.03)' },
-          horzLines: { color: 'rgba(255,255,255,0.03)' },
+          vertLines: { color: 'rgba(255,255,255,0.04)' },
+          horzLines: { color: 'rgba(255,255,255,0.04)' },
         },
-        crosshair: { mode: 1 },
-        timeScale:       { borderColor: 'rgba(255,255,255,0.06)', timeVisible: true },
-        rightPriceScale: { borderColor: 'rgba(255,255,255,0.06)', scaleMargins: { top: 0.1, bottom: 0.1 } },
+        crosshair: {
+          mode: 1,
+          vertLine: { color: 'rgba(235,235,245,0.2)', labelBackgroundColor: '#3a3a3c' },
+          horzLine: { color: 'rgba(235,235,245,0.2)', labelBackgroundColor: '#3a3a3c' },
+        },
+        timeScale:       { borderColor: 'rgba(255,255,255,0.06)', timeVisible: true, secondsVisible: false },
+        rightPriceScale: { borderColor: 'rgba(255,255,255,0.06)', scaleMargins: { top: 0.08, bottom: 0.08 } },
         width:  containerRef.current.clientWidth,
-        height: 360,
+        height: 400,
       });
 
       const series = chart.addSeries(CandlestickSeries, {
-        upColor:       '#34d399',
-        downColor:     '#f87171',
+        upColor:       '#30d158',
+        downColor:     '#ff453a',
         borderVisible: false,
-        wickUpColor:   '#34d399',
-        wickDownColor: '#f87171',
+        wickUpColor:   '#30d158',
+        wickDownColor: '#ff453a',
       });
 
       chartRef.current  = chart;
@@ -67,7 +71,7 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
       });
       obsRef.current.observe(containerRef.current);
 
-      setChartReady(true); // ← déclenche le fetch seulement maintenant
+      setChartReady(true);
     });
 
     return () => {
@@ -78,36 +82,30 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
       seriesRef.current = null;
       setChartReady(false);
     };
-  }, []); // init une seule fois
+  }, []);
 
-  // ── Fetch data : attend que chartReady soit true ───────────────────────────
+  // Fetch data
   useEffect(() => {
     if (!chartReady || !seriesRef.current) return;
     setLoading(true);
 
     async function load() {
       try {
-        // Quote
         const qRes  = await fetch(`/api/quote?symbols=${encodeURIComponent(symbol)}`);
         const qData = await qRes.json();
         if (Array.isArray(qData) && qData[0]) setQuote(qData[0]);
 
-        // Candles
         const cRes = await fetch(
           `/api/candles?symbol=${encodeURIComponent(symbol)}&resolution=${resolution.value}`
         );
         const raw = await cRes.json();
 
         if (raw.s === 'ok' && seriesRef.current) {
-          const cutoff  = Math.floor(Date.now() / 1000) - resolution.days * 86400;
+          const cutoff = Math.floor(Date.now() / 1000) - resolution.days * 86400;
           const candles: Candle[] = (raw.t as number[])
             .map((t, i) => ({
-              time:   t,
-              open:   raw.o[i],
-              high:   raw.h[i],
-              low:    raw.l[i],
-              close:  raw.c[i],
-              volume: raw.v[i],
+              time: t, open: raw.o[i], high: raw.h[i],
+              low: raw.l[i], close: raw.c[i], volume: raw.v[i],
             }))
             .filter(c => c.time >= cutoff)
             .sort((a, b) => a.time - b.time);
@@ -121,81 +119,102 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
     }
 
     load();
-  }, [symbol, resolution, chartReady]); // ← chartReady dans les deps
+  }, [symbol, resolution, chartReady]);
 
   const isUp  = quote ? quote.dp >= 0 : null;
-  const color = isUp === null ? '#94a3b8' : isUp ? '#34d399' : '#f87171';
+  const color = isUp === null ? 'rgba(235,235,245,0.6)' : isUp ? 'var(--green)' : 'var(--red)';
 
   return (
-    <div className="glass rounded-2xl overflow-hidden relative">
-      {/* Glow déco */}
-      <div style={{
-        position: 'absolute', top: -50, right: -50,
-        width: 250, height: 250, borderRadius: '50%',
-        background: color, filter: 'blur(80px)',
-        opacity: 0.06, pointerEvents: 'none',
-      }} />
+    <div style={{ background: '#1c1c1e', borderRadius: 20, overflow: 'hidden' }}>
 
       {/* Header */}
-      <div
-        className="px-5 py-4 flex items-start justify-between flex-wrap gap-3"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-      >
+      <div style={{
+        padding: '24px 24px 20px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', justifyContent: 'space-between',
+        alignItems: 'flex-start', flexWrap: 'wrap', gap: 16,
+      }}>
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-lg font-black text-white">{symbol}</span>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full muted"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}
-            >
+          {/* Symbole + nom */}
+          <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom: 8 }}>
+            <span style={{ fontSize: 24, fontWeight: 700, color: '#fff', letterSpacing: '-0.4px' }}>
+              {symbol}
+            </span>
+            <span style={{ fontSize: 15, color: 'rgba(235,235,245,0.45)', fontWeight: 400 }}>
               {label}
             </span>
           </div>
 
-          {quote && (
-            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              <span className="text-2xl font-black text-white num">{fmt(quote.c)}</span>
-              <span
-                className="text-sm font-bold num px-2.5 py-1 rounded-full"
-                style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}
-              >
-                {isUp ? '▲ +' : '▼ '}{quote.d.toFixed(2)} ({isUp ? '+' : ''}{quote.dp.toFixed(2)}%)
+          {/* Prix + variation */}
+          {quote ? (
+            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+              <span className="num" style={{
+                fontSize: 36, fontWeight: 700,
+                letterSpacing: '-0.5px', color: '#fff', lineHeight: 1,
+              }}>
+                {fmt(quote.c)}
               </span>
+              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                <span className="num" style={{ fontSize: 15, fontWeight: 600, color }}>
+                  {isUp ? '+' : ''}{fmt(quote.d)}
+                </span>
+                <span
+                  className={`num ${isUp ? 'pill-up' : 'pill-down'}`}
+                  style={{ fontSize: 13, fontWeight: 600, padding: '2px 8px', textAlign:'center' }}
+                >
+                  {isUp ? '+' : ''}{quote.dp.toFixed(2)}%
+                </span>
+              </div>
             </div>
+          ) : (
+            <div style={{
+              height: 36, width: 160, background: '#2c2c2e', borderRadius: 8,
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }} />
           )}
 
+          {/* H / B / Préc */}
           {quote && (
-            <div className="flex gap-4 mt-1">
+            <div style={{ display:'flex', gap:20, marginTop:10 }}>
               {[
-                { label: 'H',     val: fmt(quote.h)  },
-                { label: 'B',     val: fmt(quote.l)  },
-                { label: 'Préc.', val: fmt(quote.pc) },
+                { label:'Haut',   val: fmt(quote.h)  },
+                { label:'Bas',    val: fmt(quote.l)   },
+                { label:'Préc.',  val: fmt(quote.pc)  },
               ].map(({ label: l, val }) => (
-                <div key={l} className="flex items-center gap-1">
-                  <span className="text-xs muted">{l}</span>
-                  <span className="text-xs text-slate-300 num">{val}</span>
+                <div key={l}>
+                  <span style={{ fontSize:12, color:'rgba(235,235,245,0.4)', marginRight:4 }}>{l}</span>
+                  <span className="num" style={{ fontSize:13, color:'rgba(235,235,245,0.75)', fontWeight:500 }}>{val}</span>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Sélecteur période */}
-        <div
-          className="flex gap-1 rounded-xl p-0.5"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-        >
+        {/* Sélecteur période — style iOS segmented control */}
+        <div style={{
+          display: 'flex',
+          gap: 2,
+          background: '#2c2c2e',
+          borderRadius: 10,
+          padding: 3,
+        }}>
           {RESOLUTIONS.map(r => (
             <button
               key={r.label}
               onClick={() => setResolution(r)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
               style={{
-                background: resolution.label === r.label ? 'rgba(244,114,182,0.15)' : 'transparent',
-                color:      resolution.label === r.label ? '#f472b6' : 'rgba(148,163,184,0.5)',
-                border:     resolution.label === r.label
-                  ? '1px solid rgba(244,114,182,0.25)'
-                  : '1px solid transparent',
+                padding:       '6px 14px',
+                borderRadius:  8,
+                border:        'none',
+                fontSize:      13,
+                fontWeight:    600,
+                fontFamily:    'inherit',
+                cursor:        'pointer',
+                transition:    'background 0.2s, color 0.2s',
+                letterSpacing: '-0.08px',
+                background:    resolution.label === r.label ? '#3a3a3c' : 'transparent',
+                color:         resolution.label === r.label ? '#fff' : 'rgba(235,235,245,0.45)',
+                boxShadow:     resolution.label === r.label ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
               }}
             >
               {r.label}
@@ -205,20 +224,28 @@ export default function StockChart({ symbol, label }: { symbol: string; label: s
       </div>
 
       {/* Chart */}
-      <div className="relative">
+      <div style={{ position:'relative' }}>
         {loading && (
-          <div
-            className="absolute inset-0 flex items-center justify-center z-10"
-            style={{ background: 'rgba(13,11,30,0.6)', backdropFilter: 'blur(4px)' }}
-          >
-            <div
-              className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: '#818cf8', borderTopColor: 'transparent' }}
-            />
+          <div style={{
+            position:'absolute', inset:0, display:'flex',
+            alignItems:'center', justifyContent:'center', zIndex:10,
+            background: 'rgba(28,28,30,0.7)', backdropFilter:'blur(4px)',
+          }}>
+            <div style={{
+              width:28, height:28, borderRadius:'50%',
+              border:'2px solid rgba(10,132,255,0.3)',
+              borderTopColor: 'var(--blue)',
+              animation:'spin 0.7s linear infinite',
+            }} />
           </div>
         )}
-        <div ref={containerRef} className="w-full" />
+        <div ref={containerRef} style={{ width:'100%' }} />
       </div>
+
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:.8} }
+        @keyframes spin  { to{transform:rotate(360deg)} }
+      `}</style>
     </div>
   );
 }
